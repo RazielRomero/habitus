@@ -16,6 +16,14 @@ if (isset($_GET['user_id'])) {
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user) {
+            $user['id'] = (int)$user['id'];
+            $user['name'] = $user['name'] ?? "";
+            $user['email'] = $user['email'] ?? "";
+            $user['gender'] = $user['gender'] ?? "";
+            $user['birth_date'] = $user['birth_date'] ?? "";
+            $user['height_cm'] = isset($user['height_cm']) ? (string)$user['height_cm'] : "";
+            $user['weight_kg'] = isset($user['weight_kg']) ? (string)$user['weight_kg'] : "";
+            
             http_response_code(200);
             echo json_encode($user);
         } else {
