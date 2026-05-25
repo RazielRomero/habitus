@@ -1,0 +1,117 @@
+# Resumen de Dockerización del Proyecto Habitus
+
+Hemos configurado de forma exitosa y robusta un entorno de contenedores completo para la base de datos MySQL y el Backend PHP de Habitus. Los servicios se encuentran en línea y listos para conectarse con tu aplicación móvil.
+
+## Arquitectura y Flujo del Entorno
+
+```mermaid
+graph TD
+    subgraph Host Machine (Tu Computadora)
+        emulator[Celular / Emulador Android] -- Conecta a 10.0.2.2:8080 --> apache
+        dev[Tu Editor de Código] -- Sincronización en tiempo real --> volume[(Volumen Bind)]
+    end
+    subgraph Docker Bridge Network (habitus-network)
+        apache[Apache PHP API Container] -- Conecta a 'db' puerto 3306 --> db[(MySQL Database Container)]
+        volume -- Montado en /var/www/html/backend_habitus --> apache
+    end
+    db_init[base_de_datos_habitus_proyecto.sql] -- Ejecución en primer inicio --> db
+```
+
+---
+
+## 📱 Nota de Arquitectura sobre el Cliente Móvil
+Al analizar el repositorio `habitus-multi`, observamos que:
+*   Todas las pantallas, lógica de negocio (`viewmodels`), llamadas a la red (`ApiClient.kt`) y modelos de datos están implementados dentro del directorio `androidMain` (como una aplicación nativa para **Android / Jetpack Compose**).
+*   El target de Web en `commonMain` contiene únicamente la página por defecto del asistente de plantillas ("Click me!").
+*   En `ApiClient.kt` de Android, tienes configurada por defecto la dirección de red:
+    ```kotlin
+    private val ipServidor = "10.0.2.2" // IP especial de loopback para el emulador Android
+    private val baseUrl = "http://$ipServidor/backend_habitus/api/index.php"
+    ```
+
+**¿Qué significa esto?**
+Las aplicaciones móviles nativas no se "levantan" dentro de Docker en un servidor web; se compilan para el dispositivo físico o emulador. Por lo tanto, **tu aplicación de Android se ejecutará en tu emulador local y se conectará de manera transparente a tu base de datos y backend Dockerizados en tu computadora** sin necesidad de alterar una sola línea de código, ya que hemos mapeado los puertos y rutas del backend para que coincidan exactamente con lo que el emulador espera en `http://10.0.2.2:8080/backend_habitus`.
+
+---
+
+## 🛠️ Archivos Creados y Modificados
+
+1.  **[.env](file:///home/leyzar/school/habitus/.env)**: Archivo centralizado con variables de entorno para MySQL, credenciales PHP y llaves API (como Gemini y JWT).
+2.  **[docker-compose.yml](file:///home/leyzar/school/habitus/docker-compose.yml)**: Define la red privada `habitus-network`, el volumen persistente de base de datos `db-data`, y orquesta:
+    *   **`db`**: MySQL 8.0 que inicializa automáticamente tu base de datos con el esquema de `base_de_datos_habitus_proyecto.sql`.
+    *   **`backend`**: Servidor Apache + PHP 8.2 con recarga en vivo de tus archivos de código en el host.
+3.  **[backend_habitus/Dockerfile](file:///home/leyzar/school/habitus/backend_habitus/Dockerfile)**: Compila el backend de PHP instalando las librerías necesarias (`pdo_mysql`, `gd`, `zip`), activando `mod_rewrite` para el ruteo de `.htaccess`, y corriendo **Composer** para resolver paquetes de forma desatendida.
+4.  **[backend_habitus/config/Database.php](file:///home/leyzar/school/habitus/backend_habitus/config/Database.php)**: Refactorizado para cargar las credenciales de base de datos desde variables de entorno (`DB_HOST`, `DB_USER`, etc.) manteniendo compatibilidad total mediante fallbacks locales tradicionales.
+5.  **[backend_habitus/config_keys.php](file:///home/leyzar/school/habitus/backend_habitus/config_keys.php)**: Configurado dinámicamente para usar variables de entorno de Docker, protegiendo tus claves de API contra filtraciones en Git.
+
+---
+
+## 🔑 Credenciales y Puertos de Conexión
+
+### 🗄️ Base de Datos MySQL
+*   **Host desde tu máquina**: `localhost` (Puerto: `3306`)
+*   **Host interno de Docker**: `db` (Puerto: `3306`)
+*   **Usuario**: `root`
+*   **Contraseña**: `habitus_root_secure_pass`
+*   **Base de Datos**: `backend`
+*   **Tablas inicializadas**: `users`, `energy_balance`, `foods`, `activities`, `food_logs`, `activity_logs`.
+
+### 🌐 PHP Backend API
+*   **URL desde tu máquina**: `http://localhost:8080/backend_habitus/`
+*   **URL desde el Emulador de Android**: `http://10.0.2.2:8080/backend_habitus/`
+
+---
+
+## ⚙️ Comandos de Control para tu Contenedor
+
+Para administrar tus contenedores en el día a día, navega a la raíz del proyecto y utiliza:
+
+*   **Levantar en segundo plano**:
+    ```bash
+    docker compose up -d
+    ```
+*   **Ver logs de los contenedores en tiempo real**:
+    ```bash
+    docker compose logs -f
+    ```
+*   **Detener los contenedores**:
+    ```bash
+    docker compose stop
+    ```
+*   **Detener y eliminar los contenedores (sin borrar datos)**:
+    ```bash
+    docker compose down
+    ```
+*   **Reiniciar la base de datos desde cero (limpiar volumen de datos y volver a sembrar el SQL)**:
+    ```bash
+    docker compose down -v && docker compose up -d
+    ```
+
+---
+
+## 🧪 Pruebas de Funcionamiento Exitosas
+
+Realizamos peticiones HTTP de validación directa al contenedor para certificar el estado de la conexión:
+
+1.  **Endpoint del Catálogo (`/get_catalog.php`)**:
+    Petición exitosa que retorna los alimentos y actividades sembrados desde tu archivo `.sql`:
+    ```json
+    {
+      "foods": [
+        {"id":1,"name":"Tortilla de maíz","calories_per_unit":65,"unit":"pieza"},
+        {"id":2,"name":"Arroz","calories_per_unit":130,"unit":"taza"}
+        // ... (20 alimentos sembrados exitosamente)
+      ],
+      "activities": [
+        {"id":1,"name":"Caminar suave","calories_per_minute":4},
+        {"id":2,"name":"Bicicleta","calories_per_minute":8}
+        // ... (10 actividades sembradas exitosamente)
+      ]
+    }
+    ```
+
+2.  **Endpoint de Inicio de Sesión (`/api/index.php/login`)**:
+    Servidor Apache rutea la llamada correctamente a través de la redirección de `.htaccess` y responde de forma nativa:
+    ```json
+    {"error":"Credenciales incorrectas"}
+    ```

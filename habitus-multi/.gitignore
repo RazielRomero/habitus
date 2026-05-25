@@ -1,0 +1,23 @@
+# --- Gradle & Build Outputs ---
+.gradle/
+build/
+.kotlin/
+.scannerwork/
+
+# --- Local Configurations (Secrets / Local Paths) ---
+local.properties
+
+# --- Android Studio / IntelliJ IDEA ---
+.idea/
+*.iml
+.navigation/
+
+# --- Keystores & APKs ---
+*.keystore
+*.jks
+*.apk
+*.aar
+*.jar
+
+# --- OS Specific Files ---
+.DS_Store

@@ -1,0 +1,55 @@
+services:
+
+  db:
+    image: mysql:8.0
+    container_name: habitus_db
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    volumes:
+      
+      - db-data:/var/lib/mysql
+      
+      - ./backend_habitus/base_de_datos_habitus_proyecto.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - habitus-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend_habitus
+      dockerfile: Dockerfile
+    container_name: habitus_backend
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+    volumes:
+      - ./backend_habitus:/var/www/html/backend_habitus
+      - /var/www/html/backend_habitus/vendor
+    networks:
+      - habitus-network
+    depends_on:
+      db:
+        condition: service_healthy
+
+
+volumes:
+  db-data:
+
+networks:
+  habitus-network:
+    driver: bridge

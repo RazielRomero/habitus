@@ -1,0 +1,10 @@
+RewriteEngine On
+
+# Si el archivo existe físicamente (ej. una imagen), no lo redirijas
+RewriteCond %{REQUEST_FILENAME} !-f
+
+# Si el directorio existe físicamente, no lo redirijas
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Si no existe, envía absolutamente todo el tráfico al index.php
+RewriteRule ^(.*)$ index.php [QSA,L]
